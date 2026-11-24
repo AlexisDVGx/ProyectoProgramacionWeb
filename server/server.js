@@ -17,13 +17,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
+
+const allowedOrigins =
+  !process.env.CLIENT_URL || process.env.CLIENT_URL === '*'
+    ? '*'
+    : process.env.CLIENT_URL.split(',').map((url) => url.trim());
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
 app.use(express.json({ limit: '2mb' }));
 
 app.get('/api/health', async (req, res, next) => {
