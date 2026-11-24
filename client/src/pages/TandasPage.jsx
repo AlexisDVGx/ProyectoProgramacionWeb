@@ -12,9 +12,12 @@ import {
   Archive,
   UserCheck,
   AlertTriangle,
+  FileText,
   X,
 } from 'lucide-react';
 import { db } from '../db/dexieDb.js';
+import { generarComprobanteTandaPDF } from '../services/pdfReceiptService.js';
+
 import {
   asegurarClienteAdmin,
   crearTandaOnline,
@@ -464,10 +467,27 @@ export default function TandasPage({ user }) {
                               <Award size={13} /> Su turno (No paga)
                             </span>
                           ) : pagoRegistrado ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                              <CheckCircle2 size={13} /> Pagado
-                            </span>
-                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                                <CheckCircle2 size={13} /> Pagado
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  generarComprobanteTandaPDF({
+                                    cliente: cli,
+                                    tanda,
+                                    participante: part,
+                                    pago: pagoRegistrado,
+                                  })
+                                }
+                                title="Descargar comprobante PDF"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white border border-slate-300 hover:border-teal-600 text-slate-700 hover:text-teal-700 text-xs font-semibold shadow-sm transition"
+                              >
+                                <FileText size={13} /> PDF
+                              </button>
+                            </div>
+                            ) : (
                             <button
                               onClick={() => handleCobrarRonda(tanda, part, rondaActual)}
                               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold shadow-sm"

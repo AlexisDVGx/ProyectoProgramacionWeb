@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { db } from '../db/dexieDb.js';
 import { crearVentaOfflineFirst, registrarAbonoOfflineFirst } from '../services/cobrosService.js';
+import { FileText } from 'lucide-react';
+import { generarComprobanteAbonoPDF } from '../services/pdfReceiptService.js';
 
 export default function CobrosPage() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), [], []);
@@ -283,9 +285,25 @@ export default function CobrosPage() {
                               <p className="text-[11px] text-slate-500">{abono.notas}</p>
                             )}
                           </div>
-                          <span className="font-bold text-emerald-600">
-                            +${Number(abono.monto).toFixed(2)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-bold text-emerald-600">
+                              +${Number(abono.monto).toFixed(2)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                generarComprobanteAbonoPDF({
+                                  cliente,
+                                  venta: { ...venta, descripcion: venta.concepto },
+                                  abono,
+                                })
+                              }
+                              title="Descargar comprobante PDF"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 text-[11px] font-semibold border border-teal-200 transition"
+                            >
+                              <FileText size={12} /> PDF
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}
