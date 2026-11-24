@@ -28,6 +28,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState('inicio');
+  const [inicioResetKey, setInicioResetKey] = useState(0);
 
   // Estados para Login / Registro
   const [isRegister, setIsRegister] = useState(false);
@@ -219,11 +220,41 @@ export default function App() {
   }
 
   const navItems = [
-    { id: 'inicio', label: 'Inicio', icon: LayoutDashboard },
-    { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'cobros', label: 'Cobros', icon: HandCoins },
-    { id: 'tandas', label: 'Tandas', icon: Repeat },
-    { id: 'gastos', label: 'Gastos', icon: Wallet },
+    {
+      id: 'inicio',
+      label: 'Inicio',
+      icon: LayoutDashboard,
+      iconColor: 'text-teal-700',
+      activeBg: 'bg-teal-50 text-teal-800',
+    },
+    {
+      id: 'clientes',
+      label: 'Clientes',
+      icon: Users,
+      iconColor: 'text-sky-600',
+      activeBg: 'bg-sky-50 text-sky-800',
+    },
+    {
+      id: 'cobros',
+      label: 'Cobros',
+      icon: HandCoins,
+      iconColor: 'text-emerald-600',
+      activeBg: 'bg-emerald-50 text-emerald-800',
+    },
+    {
+      id: 'tandas',
+      label: 'Tandas',
+      icon: Repeat,
+      iconColor: 'text-indigo-600',
+      activeBg: 'bg-indigo-50 text-indigo-800',
+    },
+    {
+      id: 'gastos',
+      label: 'Gastos',
+      icon: Wallet,
+      iconColor: 'text-rose-600',
+      activeBg: 'bg-rose-50 text-rose-800',
+    },
   ];
 
   return (
@@ -268,6 +299,8 @@ export default function App() {
       <main className="p-4">
         {activeTab === 'inicio' && (
           <DashboardPage
+            key={inicioResetKey}
+            user={user}
             onNavigate={setActiveTab}
             isOnline={isOnline}
             syncing={syncing}
@@ -276,11 +309,11 @@ export default function App() {
         )}
         {activeTab === 'clientes' && <ClientesPage />}
         {activeTab === 'cobros' && <CobrosPage />}
-        {activeTab === 'tandas' && <TandasPage />}
+        {activeTab === 'tandas' && <TandasPage user={user} />}
         {activeTab === 'gastos' && <GastosPage />}
       </main>
 
-      {/* Barra de navegación inferior */}
+      {/* Barra de navegación inferior con íconos a color */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white border-t border-slate-200 px-2 py-1.5 flex justify-around z-20">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -288,12 +321,19 @@ export default function App() {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center py-1 px-2.5 rounded-xl text-xs font-medium transition ${
-                active ? 'text-teal-700 bg-teal-50 font-semibold' : 'text-slate-500 hover:text-slate-800'
+              onClick={() => {
+                if (item.id === 'inicio' && activeTab === 'inicio') {
+                  setInicioResetKey((k) => k + 1);
+                }
+                setActiveTab(item.id);
+              }}
+              className={`flex flex-col items-center py-1.5 px-3 rounded-xl text-xs transition ${
+                active
+                  ? `${item.activeBg} font-bold shadow-2xs`
+                  : 'text-slate-600 font-medium hover:bg-slate-100'
               }`}
             >
-              <Icon size={20} className="mb-0.5" />
+              <Icon size={21} className={`mb-0.5 ${item.iconColor}`} />
               {item.label}
             </button>
           );

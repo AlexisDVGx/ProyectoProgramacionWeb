@@ -18,6 +18,11 @@ import {
   editarClienteOfflineFirst,
   eliminarClienteOfflineFirst,
 } from '../services/cobrosService.js';
+import {
+  LADAS_PAISES,
+  separarLadaYNumero,
+  formatearTelefonoVisible,
+} from '../utils/phoneUtils.js';
 
 export default function ClientesPage() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), [], []);
@@ -26,7 +31,7 @@ export default function ClientesPage() {
   const [busqueda, setBusqueda] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [clienteEditando, setClienteEditando] = useState(null);
-  const [form, setForm] = useState({ nombre: '', telefono: '', notas: '' });
+  const [form, setForm] = useState({ nombre: '', lada: '52', telefono: '', notas: '' });
   const [error, setError] = useState('');
   const [copiadoToken, setCopiadoToken] = useState(null);
 
@@ -48,16 +53,18 @@ export default function ClientesPage() {
 
   const abrirModalNuevo = () => {
     setClienteEditando(null);
-    setForm({ nombre: '', telefono: '', notas: '' });
+    setForm({ nombre: '', lada: '52', telefono: '', notas: '' });
     setError('');
     setModalAbierto(true);
   };
 
   const abrirModalEditar = (cliente) => {
+    const { lada, numero } = separarLadaYNumero(cliente.telefono);
     setClienteEditando(cliente);
     setForm({
       nombre: cliente.nombre,
-      telefono: cliente.telefono,
+      lada,
+      telefono: numero,
       notas: cliente.notas || '',
     });
     setError('');
@@ -71,15 +78,28 @@ export default function ClientesPage() {
     if (form.nombre.trim().length < 2) {
       return setError('Ingresa el nombre completo del cliente.');
     }
-    if (!/^\d{8,15}$/.test(form.telefono.trim())) {
-      return setError('El teléfono debe contener entre 8 y 15 dígitos numéricos.');
+
+    const numeroLimpio = form.telefono.replace(/\D/g, '');
+    if (!/^\d{7,12}$/.test(numeroLimpio)) {
+      return setError('Ingresa un número válido (entre 7 y 10 dígitos sin la lada).');
     }
+
+    const telefonoCompleto = `${form.lada}${numeroLimpio}`;
+    if (telefonoCompleto.length > 15) {
+      return setError('El teléfono con lada no puede superar los 15 dígitos.');
+    }
+
+    const payload = {
+      nombre: form.nombre,
+      telefono: telefonoCompleto,
+      notas: form.notas,
+    };
 
     try {
       if (clienteEditando) {
-        await editarClienteOfflineFirst(clienteEditando, form);
+        await editarClienteOfflineFirst(clienteEditando, payload);
       } else {
-        await crearClienteOfflineFirst(form);
+        await crearClienteOfflineFirst(payload);
       }
       setModalAbierto(false);
     } catch (err) {
@@ -90,7 +110,9 @@ export default function ClientesPage() {
   const handleEliminar = async (cliente) => {
     const deuda = calcularDeudaCliente(cliente);
     if (deuda > 0) {
-      alert(`No puedes eliminar a ${cliente.nombre} porque tiene un saldo pendiente de $${deuda.toFixed(2)}.`);
+      alert(
+        `No puedes eliminar a ${cliente.nombre} porque tiene un saldo pendiente de $${deuda.toFixed(2)}.`
+      );
       return;
     }
     if (confirm(`¿Eliminar a ${cliente.nombre} de tu directorio?`)) {
@@ -104,6 +126,8 @@ export default function ClientesPage() {
     setCopiadoToken(token);
     setTimeout(() => setCopiadoToken(null), 2500);
   };
+
+  const paisSeleccionado = LADAS_PAISES.find((p) => p.code === form.lada) || LADAS_PAISES[0];
 
   return (
     <div className="space-y-4">
@@ -143,6 +167,7 @@ export default function ClientesPage() {
         <div className="space-y-3">
           {clientesFiltrados.map((cliente) => {
             const deuda = calcularDeudaCliente(cliente);
+            const telFormateado = formatearTelefonoVisible(cliente.telefono);
             return (
               <div
                 key={cliente.local_id}
@@ -164,10 +189,10 @@ export default function ClientesPage() {
                       )}
                     </div>
                     <a
-                      href={`tel:${cliente.telefono}`}
+                      href={`tel:${telFormateado.replace(/\s/g, '')}`}
                       className="inline-flex items-center gap-1 text-xs text-slate-600 mt-0.5 hover:text-teal-700"
                     >
-                      <Phone size={13} /> {cliente.telefono}
+                      <Phone size={13} /> {telFormateado}
                     </a>
                     {cliente.notas && (
                       <p className="text-xs text-slate-500 mt-1 italic">"{cliente.notas}"</p>
@@ -236,7 +261,10 @@ export default function ClientesPage() {
               <h3 className="font-bold text-slate-800">
                 {clienteEditando ? 'Editar Cliente' : 'Nuevo Cliente'}
               </h3>
-              <button onClick={() => setModalAbierto(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setModalAbierto(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -249,7 +277,9 @@ export default function ClientesPage() {
 
             <form onSubmit={handleGuardar} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre completo *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Nombre completo *
+                </label>
                 <input
                   type="text"
                   required
@@ -261,19 +291,44 @@ export default function ClientesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono (WhatsApp) *</label>
-                <input
-                  type="tel"
-                  required
-                  value={form.telefono}
-                  onChange={(e) => setForm({ ...form, telefono: e.target.value.replace(/\D/g, '') })}
-                  placeholder="Ej. 7821001122"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-teal-600"
-                />
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Teléfono (WhatsApp) *
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={form.lada}
+                    onChange={(e) => setForm({ ...form, lada: e.target.value })}
+                    className="w-40 px-2.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold bg-slate-50 focus:outline-none focus:border-teal-600 shrink-0"
+                  >
+                    {LADAS_PAISES.map((pais) => (
+                      <option key={pais.code} value={pais.code}>
+                        {pais.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={paisSeleccionado.maxDigits}
+                    value={form.telefono}
+                    onChange={(e) =>
+                      setForm({ ...form, telefono: e.target.value.replace(/\D/g, '') })
+                    }
+                    placeholder={form.lada === '1' ? 'Ej. 9842842923' : 'Ej. 7821001122'}
+                    className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-teal-600"
+                  />
+                </div>
+                {form.telefono && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Número WhatsApp: <strong>+{form.lada} {form.telefono}</strong>
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Notas o referencia</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Notas o referencia
+                </label>
                 <input
                   type="text"
                   value={form.notas}

@@ -14,6 +14,7 @@ import { db } from '../db/dexieDb.js';
 import { crearVentaOfflineFirst, registrarAbonoOfflineFirst } from '../services/cobrosService.js';
 import { FileText } from 'lucide-react';
 import { generarComprobanteAbonoPDF } from '../services/pdfReceiptService.js';
+import { obtenerTelefonoWhatsApp } from '../utils/phoneUtils.js';
 
 export default function CobrosPage() {
   const clientes = useLiveQuery(() => db.clientes.orderBy('nombre').toArray(), [], []);
@@ -105,17 +106,18 @@ export default function CobrosPage() {
   };
 
   const abrirWhatsAppEstado = (cliente, venta) => {
-    if (!cliente) return;
-    const linkPublico = `${window.location.origin}/estado-cuenta/${cliente.token_acceso}`;
-    const mensaje = encodeURIComponent(
-      `Hola ${cliente.nombre}, te comparto el resumen de tu compra "${venta.concepto}" (Total: $${Number(
-        venta.monto_total
-      ).toFixed(2)}). Tu saldo pendiente actual es de $${Number(venta.saldo_pendiente).toFixed(
-        2
-      )}. Consulta tus recibos aquí: ${linkPublico}`
-    );
-    window.open(`https://wa.me/52${cliente.telefono}?text=${mensaje}`, '_blank');
-  };
+  if (!cliente) return;
+  const telefonoE164 = obtenerTelefonoWhatsApp(cliente.telefono);
+  const linkPublico = `${window.location.origin}/estado-cuenta/${cliente.token_acceso}`;
+  const mensaje = encodeURIComponent(
+    `Hola ${cliente.nombre}, te comparto el resumen de tu compra "${venta.concepto}" (Total: $${Number(
+      venta.monto_total
+    ).toFixed(2)}). Tu saldo pendiente actual es de $${Number(venta.saldo_pendiente).toFixed(
+      2
+    )}. Consulta tus recibos aquí: ${linkPublico}`
+  );
+  window.open(`https://wa.me/${telefonoE164}?text=${mensaje}`, '_blank');
+};
 
   return (
     <div className="space-y-4">
