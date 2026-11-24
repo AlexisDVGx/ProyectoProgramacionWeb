@@ -11,6 +11,7 @@ import {
   Trash2,
   Archive,
   UserCheck,
+  AlertTriangle,
   X,
 } from 'lucide-react';
 import { db } from '../db/dexieDb.js';
@@ -41,6 +42,8 @@ export default function TandasPage({ user }) {
 
   const [vistaEstado, setVistaEstado] = useState('ACTIVA'); // 'ACTIVA' | 'FINALIZADA'
   const [rondaActivaPorTanda, setRondaActivaPorTanda] = useState({});
+  const [alertaAviso, setAlertaAviso] = useState(null);
+  const [tandaPorTerminar, setTandaPorTerminar] = useState(null);
 
   // Modal Nueva Tanda
   const [modalNueva, setModalNueva] = useState(false);
@@ -173,18 +176,47 @@ export default function TandasPage({ user }) {
         numero_ronda: numeroRonda,
       });
     } catch (err) {
-      alert(err.message);
+      setAlertaAviso({
+        titulo: 'Aviso de cobro',
+        mensaje: err.message,
+      });
     }
   };
 
-  const handleTerminarTanda = async (tanda) => {
-    if (
-      confirm(
-        `¿Marcar "${tanda.nombre}" como terminada? Podrás consultarla en la pestaña Terminadas.`
-      )
-    ) {
-      await finalizarTandaOfflineFirst(tanda);
+  const handleToggleEntrega = async ({
+    tanda,
+    participanteEnTurno,
+    rondaActual,
+    pagosEnRonda,
+    totalPagadores,
+  }) => {
+    const nuevoEstado = !participanteEnTurno.entregado;
+
+    if (nuevoEstado && pagosEnRonda < totalPagadores) {
+      const faltantes = totalPagadores - pagosEnRonda;
+      setAlertaAviso({
+        titulo: 'No todos han pagado',
+        mensaje: `En la Ronda ${rondaActual} se han cobrado ${pagosEnRonda} de ${totalPagadores} aportaciones. ${
+          faltantes === 1
+            ? 'Falta 1 aportación por cobrar'
+            : `Faltan ${faltantes} aportaciones por cobrar`
+        } antes de marcar la entrega.`,
+      });
+      return;
     }
+
+    await toggleEntregaTurno({
+      tandaId: tanda.id,
+      participante: participanteEnTurno,
+      entregado: nuevoEstado,
+    });
+  };
+
+  const confirmarTerminarTanda = async () => {
+    if (!tandaPorTerminar) return;
+    const tanda = tandaPorTerminar;
+    setTandaPorTerminar(null);
+    await finalizarTandaOfflineFirst(tanda);
   };
 
   const clientesSincronizados = clientes.filter((c) => Boolean(c.id));
@@ -361,10 +393,12 @@ export default function TandasPage({ user }) {
                     ) : (
                       <button
                         onClick={() =>
-                          toggleEntregaTurno({
-                            tandaId: tanda.id,
-                            participante: participanteEnTurno,
-                            entregado: !participanteEnTurno.entregado,
+                          handleToggleEntrega({
+                            tanda,
+                            participanteEnTurno,
+                            rondaActual,
+                            pagosEnRonda,
+                            totalPagadores: participantesQuePagan.length,
                           })
                         }
                         className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
@@ -451,7 +485,7 @@ export default function TandasPage({ user }) {
                 {listaParaTerminar && (
                   <div className="pt-2 border-t border-slate-100">
                     <button
-                      onClick={() => handleTerminarTanda(tanda)}
+                      onClick={() => setTandaPorTerminar(tanda)}
                       className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm inline-flex items-center justify-center gap-1.5 transition"
                     >
                       <CheckCircle2 size={16} /> Terminar tanda y archivar en Terminadas
@@ -461,6 +495,78 @@ export default function TandasPage({ user }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Recuadro centrado de confirmación para terminar tanda */}
+      {tandaPorTerminar && (
+        <div
+          onClick={() => setTandaPorTerminar(null)}
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-slate-200 text-center space-y-4"
+          >
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={28} />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-800">¿Terminar tanda?</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                ¿Deseas marcar <strong>"{tandaPorTerminar.nombre}"</strong> como terminada?
+                Podrás consultarla cuando quieras en la pestaña <strong>Terminadas</strong>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setTandaPorTerminar(null)}
+                className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarTerminarTanda}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition"
+              >
+                Sí, terminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recuadro centrado de advertencia cuando faltan pagos */}
+      {alertaAviso && (
+        <div
+          onClick={() => setAlertaAviso(null)}
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-slate-200 text-center space-y-4"
+          >
+            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertTriangle size={26} />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-slate-800">{alertaAviso.titulo}</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">{alertaAviso.mensaje}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAlertaAviso(null)}
+              className="w-full py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold shadow-sm transition"
+            >
+              Entendido
+            </button>
+          </div>
         </div>
       )}
 
