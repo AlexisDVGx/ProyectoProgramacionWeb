@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { body, param } from 'express-validator';
-import { getTandas, createTanda, addPagoTanda, marcarEntregaTurno } from '../controllers/tandasController.js';
+import {
+  getTandas,
+  createTanda,
+  addPagoTanda,
+  marcarEntregaTurno,
+  finalizarTanda,
+} from '../controllers/tandasController.js';
 import { verifyToken } from '../middlewares/authMiddleware.js';
 import { validateRequest } from '../middlewares/errorHandler.js';
 
@@ -39,5 +45,7 @@ router.patch(
   [param('id').isInt(), param('participanteId').isInt(), body('entregado').isBoolean(), validateRequest],
   marcarEntregaTurno
 );
+
+router.patch('/:id/finalizar', [param('id').isInt(), validateRequest], finalizarTanda);
 
 export default router;

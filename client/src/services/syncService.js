@@ -10,21 +10,29 @@ export const syncWithServer = async () => {
   if (!token) return { ok: false, mensaje: 'Sesión no iniciada.' };
 
   // 1. Recolectar registros pendientes en IndexedDB
-  const [pendingClientes, pendingVentas, pendingAbonos, pendingTandaPagos, pendingGastos] =
-    await Promise.all([
-      db.clientes.where('sync_status').equals('pending').toArray(),
-      db.ventas_credito.where('sync_status').equals('pending').toArray(),
-      db.abonos.where('sync_status').equals('pending').toArray(),
-      db.tanda_pagos.where('sync_status').equals('pending').toArray(),
-      db.gastos.where('sync_status').equals('pending').toArray(),
-    ]);
+  const [
+    pendingClientes,
+    pendingVentas,
+    pendingAbonos,
+    pendingTandaPagos,
+    pendingGastos,
+    pendingTandasFinalizadas,
+  ] = await Promise.all([
+    db.clientes.where('sync_status').equals('pending').toArray(),
+    db.ventas_credito.where('sync_status').equals('pending').toArray(),
+    db.abonos.where('sync_status').equals('pending').toArray(),
+    db.tanda_pagos.where('sync_status').equals('pending').toArray(),
+    db.gastos.where('sync_status').equals('pending').toArray(),
+    db.tandas.filter((t) => t.sync_status === 'pending' && t.estado === 'FINALIZADA').toArray(),
+  ]);
 
   const hayPendientes =
     pendingClientes.length > 0 ||
     pendingVentas.length > 0 ||
     pendingAbonos.length > 0 ||
     pendingTandaPagos.length > 0 ||
-    pendingGastos.length > 0;
+    pendingGastos.length > 0 ||
+    pendingTandasFinalizadas.length > 0;
 
   // 2. Subir lote pendiente al servidor si existe
   if (hayPendientes) {
@@ -36,6 +44,7 @@ export const syncWithServer = async () => {
         abonos: pendingAbonos,
         tanda_pagos: pendingTandaPagos,
         gastos: pendingGastos,
+        tandas_finalizadas: pendingTandasFinalizadas.map((t) => t.id).filter(Boolean),
       }),
     });
   }
@@ -61,7 +70,7 @@ export const syncWithServer = async () => {
       if (ventas_credito.length)
         await db.ventas_credito.bulkAdd(ventas_credito.map((v) => ({ ...v, sync_status: 'synced' })));
       if (abonos.length) await db.abonos.bulkAdd(abonos.map((a) => ({ ...a, sync_status: 'synced' })));
-      if (tandas.length) await db.tandas.bulkAdd(tandas);
+      if (tandas.length) await db.tandas.bulkAdd(tandas.map((t) => ({ ...t, sync_status: 'synced' })));
       if (tanda_participantes.length) await db.tanda_participantes.bulkAdd(tanda_participantes);
       if (tanda_pagos.length)
         await db.tanda_pagos.bulkAdd(tanda_pagos.map((p) => ({ ...p, sync_status: 'synced' })));

@@ -135,4 +135,29 @@ export const marcarEntregaTurno = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+
+
+  
+};
+
+export const finalizarTanda = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await query(
+      `UPDATE tandas
+       SET estado = 'FINALIZADA'
+       WHERE id = $1 AND usuario_id = $2
+       RETURNING *`,
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, mensaje: 'Tanda no encontrada.' });
+    }
+
+    res.json({ ok: true, tanda: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
 };

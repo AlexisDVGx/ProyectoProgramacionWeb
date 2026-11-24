@@ -47,7 +47,7 @@ export const pushOfflineBatch = async (req, res, next) => {
   const client = await getClient();
   try {
     const userId = req.user.id;
-    const { clientes = [], ventas = [], abonos = [], tanda_pagos = [], gastos = [] } = req.body;
+    const { clientes = [], ventas = [], abonos = [], tanda_pagos = [], gastos = [], tandas_finalizadas = [], } = req.body;
 
     await client.query('BEGIN');
 
@@ -135,6 +135,14 @@ export const pushOfflineBatch = async (req, res, next) => {
          VALUES ($1, $2, $3, $4, COALESCE($5::date, CURRENT_DATE), $6::uuid)
          ON CONFLICT (sync_uuid) DO NOTHING`,
         [userId, g.categoria, g.descripcion, g.monto, g.fecha_gasto || null, g.sync_uuid]
+      );
+    }
+
+    // 6. Sincronizar tandas finalizadas offline
+    for (const tandaId of tandas_finalizadas) {
+      await client.query(
+        `UPDATE tandas SET estado = 'FINALIZADA' WHERE id = $1 AND usuario_id = $2`,
+        [tandaId, userId]
       );
     }
 

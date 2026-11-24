@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Wifi,
   WifiOff,
@@ -11,20 +10,17 @@ import {
   Wallet,
   LogOut,
 } from 'lucide-react';
-import { db, clearLocalDatabase } from './db/dexieDb.js';
+import { clearLocalDatabase } from './db/dexieDb.js';
 import { apiRequest } from './services/api.js';
 import { syncWithServer } from './services/syncService.js';
+import DashboardPage from './pages/DashboardPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
 import CobrosPage from './pages/CobrosPage.jsx';
+import TandasPage from './pages/TandasPage.jsx';
+import GastosPage from './pages/GastosPage.jsx';
 import EstadoCuentaPublico from './pages/EstadoCuentaPublico.jsx';
 
 export default function App() {
-  // Detectar si se abrió un enlace público de estado de cuenta
-  const publicMatch = window.location.pathname.match(/^\/estado-cuenta\/([0-9a-f-]{36})$/i);
-  if (publicMatch) {
-    return <EstadoCuentaPublico token={publicMatch[1]} />;
-  }
-
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user_data');
     return saved ? JSON.parse(saved) : null;
@@ -44,11 +40,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [loadingAuth, setLoadingAuth] = useState(false);
 
-  // Contadores reactivos desde IndexedDB
-  const totalClientes = useLiveQuery(() => db.clientes.count(), [], 0);
-  const totalVentas = useLiveQuery(() => db.ventas_credito.count(), [], 0);
-  const totalTandas = useLiveQuery(() => db.tandas.count(), [], 0);
-  const totalGastos = useLiveQuery(() => db.gastos.count(), [], 0);
+  const publicMatch = window.location.pathname.match(/^\/estado-cuenta\/([0-9a-f-]{36})$/i);
 
   const handleSync = useCallback(async () => {
     if (!navigator.onLine || !localStorage.getItem('auth_token')) return;
@@ -78,10 +70,14 @@ export default function App() {
   }, [handleSync]);
 
   useEffect(() => {
-    if (user && isOnline) {
+    if (user && isOnline && !publicMatch) {
       handleSync();
     }
-  }, [user, isOnline, handleSync]);
+  }, [user, isOnline, publicMatch, handleSync]);
+
+  if (publicMatch) {
+    return <EstadoCuentaPublico token={publicMatch[1]} />;
+  }
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -270,39 +266,18 @@ export default function App() {
 
       {/* Contenido por pestaña */}
       <main className="p-4">
+        {activeTab === 'inicio' && (
+          <DashboardPage
+            onNavigate={setActiveTab}
+            isOnline={isOnline}
+            syncing={syncing}
+            onSync={handleSync}
+          />
+        )}
         {activeTab === 'clientes' && <ClientesPage />}
         {activeTab === 'cobros' && <CobrosPage />}
-
-        {(activeTab === 'inicio' || activeTab === 'tandas' || activeTab === 'gastos') && (
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h2 className="font-bold text-slate-800 text-lg capitalize mb-2">
-              Sección: {activeTab}
-            </h2>
-            <p className="text-sm text-slate-600 mb-4">
-              {activeTab === 'inicio'
-                ? 'Resumen sincronizado con PostgreSQL (el Dashboard financiero completo se activa en el Módulo 6).'
-                : 'Este módulo se habilitará en el siguiente paso.'}
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-2xl font-bold text-teal-700">{totalClientes}</p>
-                <p className="text-xs text-slate-500">Clientes locales</p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-2xl font-bold text-teal-700">{totalVentas}</p>
-                <p className="text-xs text-slate-500">Ventas locales</p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-2xl font-bold text-teal-700">{totalTandas}</p>
-                <p className="text-xs text-slate-500">Tandas activas</p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-2xl font-bold text-teal-700">{totalGastos}</p>
-                <p className="text-xs text-slate-500">Gastos registrados</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'tandas' && <TandasPage />}
+        {activeTab === 'gastos' && <GastosPage />}
       </main>
 
       {/* Barra de navegación inferior */}
